@@ -5,11 +5,74 @@ import ubinascii
 import uhashlib
 import os
 import time
+from machine import Pin
+
+led_power = Pin(12, Pin.OUT)  
+led_connected = Pin(25, Pin.OUT)  
 
 from config import WIFI_SSID, WIFI_PASSWORD, DEVICE_PIN, SERVER_PORT
 
 VAULT_FILE = "vault.json"
 SESSION_VALID = False
+
+ANALYTICS_FILE = "analytics.json"
+START_TIME = time.time()
+
+def load_analytics():
+    try:
+        with open(ANALYTICS_FILE, 'r') as f:
+            return ujson.load(f)
+    except:
+        return {
+            "total_logins": 0,
+            "failed_logins": 0,
+            "last_login": None,
+            "total_passwords": 0,
+            "passwords_added": 0,
+            "passwords_updated": 0,
+            "passwords_deleted": 0,
+            "total_connections": 0,
+            "password_views": 0
+        }
+
+def save_analytics(analytics):
+    with open(ANALYTICS_FILE, 'w') as f:
+        ujson.dump(analytics, f)
+
+def get_uptime():
+    uptime_seconds = int(time.time() - START_TIME)
+    days = uptime_seconds // 86400
+    hours = (uptime_seconds % 86400) // 3600
+    minutes = (uptime_seconds % 3600) // 60
+    return f"{days}d {hours}h {minutes}m"
+
+def calculate_password_health():
+    vault = load_vault()
+    if len(vault) == 0:
+        return {"score": 100, "weak": 0, "duplicates": 0, "avg_age": 0}
+    
+    weak_count = 0
+    passwords_list = []
+    
+    for entry in vault:
+        decrypted = decrypt_data(entry['password'])
+        if decrypted and len(decrypted) < 8:
+            weak_count += 1
+        passwords_list.append(decrypted)
+    
+    duplicates = len(passwords_list) - len(set(passwords_list))
+    
+    score = 100
+    score -= (weak_count * 10)
+    score -= (duplicates * 15)
+    score = max(0, min(100, score))
+    
+    return {
+        "score": score,
+        "weak": weak_count,
+        "duplicates": duplicates,
+        "total": len(vault)
+    }
 
 def encrypt_data(data, key=DEVICE_PIN):
     key_bytes = key.encode()
@@ -57,7 +120,7 @@ def create_ap():
     print(f"IP Address: {ap.ifconfig()[0]}")
     print(f"Access PIN: {DEVICE_PIN}")
     print("=" * 40)
-    
+    led_power.on()
     return ap
 
 def load_file(filename):
@@ -88,10 +151,17 @@ def handle_request(client_socket, request):
         
         elif path == "/verify-pin" and method == "POST":
             data = parse_json(body)
+            analytics = load_analytics()
+            
             if data and data.get("pin") == DEVICE_PIN:
                 SESSION_VALID = True
+                analytics["total_logins"] += 1
+                analytics["last_login"] = time.time()
+                save_analytics(analytics)
                 send_json(client_socket, {"success": True})
             else:
+                analytics["failed_logins"] += 1
+                save_analytics(analytics)
                 send_json(client_socket, {"success": False, "error": "Invalid PIN"})
         
         elif path == "/vault":
@@ -100,9 +170,57 @@ def handle_request(client_socket, request):
                 send_response(client_socket, response)
             else:
                 send_response(client_socket, "<html><body><h1>Unauthorized</h1></body></html>", 401)
-        
+
+        elif path == "/analytics":
+            if SESSION_VALID:
+                response = load_file("web/analytics.html")
+                send_response(client_socket, response)
+            else:
+                send_response(client_socket, "<html><body><h1>Unauthorized</h1></body></html>", 401)
+
+        elif path == "/api/analytics" and method == "GET":
+            if SESSION_VALID:
+                analytics = load_analytics()
+                vault = load_vault()
+                health = calculate_password_health()
+                
+                # Calculate last login time
+                last_login = "Never"
+                if analytics["last_login"]:
+                    seconds_ago = int(time.time() - analytics["last_login"])
+                    if seconds_ago < 60:
+                        last_login = f"{seconds_ago}s ago"
+                    elif seconds_ago < 3600:
+                        last_login = f"{seconds_ago // 60}m ago"
+                    else:
+                        last_login = f"{seconds_ago // 3600}h ago"
+                
+                analytics_data = {
+                    "total_logins": analytics["total_logins"],
+                    "failed_logins": analytics["failed_logins"],
+                    "last_login": last_login,
+                    "total_passwords": len(vault),
+                    "passwords_added": analytics["passwords_added"],
+                    "passwords_updated": analytics["passwords_updated"],
+                    "passwords_deleted": analytics["passwords_deleted"],
+                    "total_connections": analytics["total_connections"],
+                    "password_views": analytics["password_views"],
+                    "uptime": get_uptime(),
+                    "health_score": health["score"],
+                    "weak_passwords": health["weak"],
+                    "duplicate_passwords": health["duplicates"]
+                }
+                
+                send_json(client_socket, analytics_data)
+            else:
+                send_json(client_socket, {"error": "Unauthorized"}, 401)
+                
         elif path == "/api/passwords" and method == "GET":
             if SESSION_VALID:
+                analytics = load_analytics()
+                analytics["password_views"] += 1
+                save_analytics(analytics)
+                
                 vault = load_vault()
                 decrypted_vault = []
                 for entry in vault:
@@ -117,6 +235,7 @@ def handle_request(client_socket, request):
             if SESSION_VALID:
                 data = parse_json(body)
                 vault = load_vault()
+                analytics = load_analytics()
                 
                 new_entry = {
                     "id": len(vault) + 1,
@@ -127,15 +246,21 @@ def handle_request(client_socket, request):
                 }
                 vault.append(new_entry)
                 save_vault(vault)
+                
+                analytics["passwords_added"] += 1
+                analytics["total_passwords"] = len(vault)
+                save_analytics(analytics)
+                
                 send_json(client_socket, {"success": True, "id": new_entry["id"]})
             else:
                 send_json(client_socket, {"error": "Unauthorized"}, 401)
-        
+                
         elif path.startswith("/api/passwords/") and method == "PUT":
             if SESSION_VALID:
                 entry_id = int(path.split("/")[-1])
                 data = parse_json(body)
                 vault = load_vault()
+                analytics = load_analytics()
                 
                 for entry in vault:
                     if entry["id"] == entry_id:
@@ -147,6 +272,9 @@ def handle_request(client_socket, request):
                         break
                 
                 save_vault(vault)
+                analytics["passwords_updated"] += 1
+                save_analytics(analytics)
+                
                 send_json(client_socket, {"success": True})
             else:
                 send_json(client_socket, {"error": "Unauthorized"}, 401)
@@ -155,14 +283,18 @@ def handle_request(client_socket, request):
             if SESSION_VALID:
                 entry_id = int(path.split("/")[-1])
                 vault = load_vault()
+                analytics = load_analytics()
+                
                 vault = [entry for entry in vault if entry["id"] != entry_id]
                 save_vault(vault)
+                
+                analytics["passwords_deleted"] += 1
+                analytics["total_passwords"] = len(vault)
+                save_analytics(analytics)
+                
                 send_json(client_socket, {"success": True})
             else:
                 send_json(client_socket, {"error": "Unauthorized"}, 401)
-        
-        else:
-            send_response(client_socket, "<html><body><h1>404 Not Found</h1></body></html>", 404)
     
     except Exception as e:
         print(f"Error handling request: {e}")
@@ -207,11 +339,21 @@ def start_server():
             client_socket, client_addr = server_socket.accept()
             print(f"Client connected from {client_addr}")
             
+            analytics = load_analytics()
+            analytics["total_connections"] += 1
+            save_analytics(analytics)
+            
+            led_connected.on()
+            
             request = client_socket.recv(2048)
             if request:
                 handle_request(client_socket, request)
             
             client_socket.close()
+            
+            time.sleep(2)
+            led_connected.off()
+            
         except Exception as e:
             print(f"Error: {e}")
 
