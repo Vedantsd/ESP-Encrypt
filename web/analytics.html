@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP-Encrypt - Analytics Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+        }
+        
+        .back-button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .back-button:hover {
+            background: white;
+            color: #ff9800;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        
+        .stat-icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .health-score {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .score-circle {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: white;
+            position: relative;
+        }
+        
+        .score-good {
+            background: linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%);
+        }
+        
+        .score-medium {
+            background: linear-gradient(135deg, #FF9800 0%, #FFC107 100%);
+        }
+        
+        .score-bad {
+            background: linear-gradient(135deg, #f44336 0%, #E91E63 100%);
+        }
+        
+        .health-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .health-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .health-item-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .health-item-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .activity-list {
+            list-style: none;
+        }
+        
+        .activity-item {
+            padding: 15px;
+            border-left: 4px solid #ff9800;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        
+        .activity-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .activity-value {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .refresh-button {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        
+        .refresh-button:hover {
+            background: #ff6f00;
+            transform: translateY(-2px);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Analytics Dashboard</h1>
+            <a href="/vault" class="back-button">← Back to Vault</a>
+        </div>
+        
+        <div id="loading" class="loading">
+            <h3>Loading analytics data...</h3>
+        </div>
+        
+        <div id="analytics-content" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🔐</div>
+                    <div class="stat-label">Total Passwords</div>
+                    <div class="stat-value" id="totalPasswords">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">🔑</div>
+                    <div class="stat-label">Total Logins</div>
+                    <div class="stat-value" id="totalLogins">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">⚠️</div>
+                    <div class="stat-label">Failed Logins</div>
+                    <div class="stat-value" id="failedLogins">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">🔌</div>
+                    <div class="stat-label">Total Connections</div>
+                    <div class="stat-value" id="totalConnections">0</div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🏥 Password Health</h2>
+                <div class="health-score">
+                    <div class="score-circle" id="scoreCircle">
+                        <span id="healthScore">0</span>
+                    </div>
+                    <h3>Security Score</h3>
+                    
+                    <div class="health-details">
+                        <div class="health-item">
+                            <div class="health-item-value" id="weakPasswords">0</div>
+                            <div class="health-item-label">Weak Passwords</div>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-item-value" id="duplicatePasswords">0</div>
+                            <div class="health-item-label">Duplicate Passwords</div>
+                        </div>
+                        <div class="health-item">
+                            <div class="health-item-value" id="totalVaultPasswords">0</div>
+                            <div class="health-item-label">Total in Vault</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📈 Activity Statistics</h2>
+                <ul class="activity-list">
+                    <li class="activity-item">
+                        <div class="activity-label">Last Login</div>
+                        <div class="activity-value" id="lastLogin">Never</div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-label">System Uptime</div>
+                        <div class="activity-value" id="uptime">0d 0h 0m</div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-label">Passwords Added</div>
+                        <div class="activity-value" id="passwordsAdded">0</div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-label">Passwords Updated</div>
+                        <div class="activity-value" id="passwordsUpdated">0</div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-label">Passwords Deleted</div>
+                        <div class="activity-value" id="passwordsDeleted">0</div>
+                    </li>
+                    <li class="activity-item">
+                        <div class="activity-label">Password Views</div>
+                        <div class="activity-value" id="passwordViews">0</div>
+                    </li>
+                </ul>
+                
+                <button class="refresh-button" onclick="loadAnalytics()">🔄 Refresh Data</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadAnalytics() {
+            try {
+                const response = await fetch('/api/analytics');
+                const data = await response.json();
+                
+                document.getElementById('totalPasswords').textContent = data.total_passwords;
+                document.getElementById('totalLogins').textContent = data.total_logins;
+                document.getElementById('failedLogins').textContent = data.failed_logins;
+                document.getElementById('totalConnections').textContent = data.total_connections;
+                
+                const healthScore = data.health_score;
+                document.getElementById('healthScore').textContent = healthScore;
+                
+                const scoreCircle = document.getElementById('scoreCircle');
+                scoreCircle.className = 'score-circle';
+                if (healthScore >= 80) {
+                    scoreCircle.classList.add('score-good');
+                } else if (healthScore >= 50) {
+                    scoreCircle.classList.add('score-medium');
+                } else {
+                    scoreCircle.classList.add('score-bad');
+                }
+                
+                document.getElementById('weakPasswords').textContent = data.weak_passwords;
+                document.getElementById('duplicatePasswords').textContent = data.duplicate_passwords;
+                document.getElementById('totalVaultPasswords').textContent = data.total_passwords;
+                
+                document.getElementById('lastLogin').textContent = data.last_login;
+                document.getElementById('uptime').textContent = data.uptime;
+                document.getElementById('passwordsAdded').textContent = data.passwords_added;
+                document.getElementById('passwordsUpdated').textContent = data.passwords_updated;
+                document.getElementById('passwordsDeleted').textContent = data.passwords_deleted;
+                document.getElementById('passwordViews').textContent = data.password_views;
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('analytics-content').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading analytics:', error);
+                document.getElementById('loading').innerHTML = '<h3>Error loading analytics data</h3>';
+            }
+        }
+        
+        loadAnalytics();
+    </script>
+</body>
+</html>
