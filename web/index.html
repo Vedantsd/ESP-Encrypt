@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP-Encrypt - Password Vault</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .add-button {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        
+        .add-button:hover {
+            background: #ff6f00;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+        }
+        
+        .password-list {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .password-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .password-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        
+        .password-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .website {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-edit {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+            transform: scale(1.05);
+        }
+        
+        .field {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .field-label {
+            font-weight: 600;
+            color: #666;
+            min-width: 100px;
+        }
+        
+        .field-value {
+            color: #333;
+            flex: 1;
+        }
+        
+        .password-field {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .password-hidden {
+            font-family: monospace;
+        }
+        
+        .toggle-password {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .modal h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #ff9800;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .btn-save {
+            background: #ff9800;
+            color: white;
+            padding: 10px 20px;
+        }
+        
+        .btn-cancel {
+            background: #ccc;
+            color: #333;
+            padding: 10px 20px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .analytics-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;    
+            margin-left: 10px;
+            transition: all 0.3s;
+        }
+
+        .analytics-button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Password Vault</h1>
+            <p class="subtitle">Your passwords are encrypted and stored securely</p>
+        </div>
+        
+        <button class="add-button" onclick="openAddModal()">➕ Add New Password</button>
+        <button class="analytics-button" onclick="window.location.href='/analytics'">📊 View Analytics</button>
+        
+        <div class="password-list" id="passwordList">
+            <div class="empty-state">
+                <div class="empty-state-icon">🔒</div>
+                <h3>No passwords saved yet</h3>
+                <p>Click "Add New Password" to get started</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Add New Password</h2>
+            <form id="passwordForm">
+                <input type="hidden" id="passwordId">
+                <div class="form-group">
+                    <label for="website">Website/Service</label>
+                    <input type="text" id="website" required>
+                </div>
+                <div class="form-group">
+                    <label for="username">Username/Email</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="notes">Notes (optional)</label>
+                    <textarea id="notes" rows="3"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        let passwords = [];
+        let editingId = null;
+        
+        async function loadPasswords() {
+            try {
+                const response = await fetch('/api/passwords');
+                passwords = await response.json();
+                renderPasswords();
+            } catch (error) {
+                console.error('Error loading passwords:', error);
+            }
+        }
+        
+        function renderPasswords() {
+            const list = document.getElementById('passwordList');
+            
+            if (passwords.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔒</div>
+                        <h3>No passwords saved yet</h3>
+                        <p>Click "Add New Password" to get started</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = passwords.map(p => `
+                <div class="password-card">
+                    <div class="password-header">
+                        <div class="website">${escapeHtml(p.website)}</div>
+                        <div class="actions">
+                            <button class="btn btn-edit" onclick="editPassword(${p.id})">✏️ Edit</button>
+                            <button class="btn btn-delete" onclick="deletePassword(${p.id})">🗑️ Delete</button>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Username:</div>
+                        <div class="field-value">${escapeHtml(p.username)}</div>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Password:</div>
+                        <div class="password-field">
+                            <span class="field-value password-hidden" id="pwd-${p.id}">••••••••</span>
+                            <button class="toggle-password" onclick="togglePassword(${p.id}, '${escapeHtml(p.password)}')">👁️ Show</button>
+                        </div>
+                    </div>
+                    ${p.notes ? `
+                    <div class="field">
+                        <div class="field-label">Notes:</div>
+                        <div class="field-value">${escapeHtml(p.notes)}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function togglePassword(id, password) {
+            const elem = document.getElementById(`pwd-${id}`);
+            const btn = event.target;
+            
+            if (elem.textContent === '••••••••') {
+                elem.textContent = password;
+                elem.classList.remove('password-hidden');
+                btn.textContent = '🙈 Hide';
+            } else {
+                elem.textContent = '••••••••';
+                elem.classList.add('password-hidden');
+                btn.textContent = '👁️ Show';
+            }
+        }
+        
+        function openAddModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = 'Add New Password';
+            document.getElementById('passwordForm').reset();
+            document.getElementById('passwordId').value = '';
+            document.getElementById('passwordModal').style.display = 'flex';
+        }
+        
+        function editPassword(id) {
+            const password = passwords.find(p => p.id === id);
+            if (!password) return;
+            
+            editingId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Password';
+            document.getElementById('passwordId').value = id;
+            document.getElementById('website').value = password.website;
+            document.getElementById('username').value = password.username;
+            document.getElementById('password').value = password.password;
+            document.getElementById('notes').value = password.notes || '';
+            document.getElementById('passwordModal').style.display = 'flex';
+        }
+        
+        function closeModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+        }
+        
+        async function deletePassword(id) {
+            if (!confirm('Are you sure you want to delete this password?')) return;
+            
+            try {
+                await fetch(`/api/passwords/${id}`, {method: 'DELETE'});
+                await loadPasswords();
+            } catch (error) {
+                alert('Error deleting password');
+            }
+        }
+        
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                website: document.getElementById('website').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                notes: document.getElementById('notes').value
+            };
+            
+            try {
+                if (editingId) {
+                    await fetch(`/api/passwords/${editingId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    await fetch('/api/passwords', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                }
+                
+                closeModal();
+                await loadPasswords();
+            } catch (error) {
+                alert('Error saving password');
+            }
+        });
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadPasswords();
+    </script>
+</body>
+</html>
